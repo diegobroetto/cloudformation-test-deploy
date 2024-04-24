@@ -1,0 +1,510 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  Environment:
+      Description:    Please specify the target environment.
+      Type:           String
+      Default:        "dev"
+      AllowedValues:
+        - prod
+        - hml
+        - dev
+      ConstraintDescription: must specify a enviroment
+
+  InstanceVPCID:
+    Description:    Please choose VPC
+    Type:           AWS::EC2::VPC::Id
+
+  AppName:
+    Description:  Application environment name.
+    Type:         String
+    Default:      "broetto"
+  
+  Owner:
+    Description:  Application owner  name.
+    Type:         String
+    Default:      "ebe"
+
+  AlternateDomainNames:
+    Description:    CNAMEs (alternate domain names), if any, for the distribution.
+    Type:           String
+    Default:        "broetto.com.br"
+  
+  SubnetID:
+    Description:    Please choose Subnet for ASG and ALB
+    Type:           List<AWS::EC2::Subnet::Id>
+  
+  HealthCheckPath:
+    Description:    Origin ALB Target Group Health Check Path.
+    Type:           String
+    Default:        "/"
+  
+  OriginALBTGPort:
+    Description:    Port number the application is running on, for Origin ALB Target Group and Health Check port.
+    Type:           String
+    Default:        "80"
+  
+  BootVolSize:
+    Description:    EC2 Instance Boot volume size.
+    Type:           String
+    Default:        "15"
+  
+  BootVolType:
+    Description:    EC2 Instance Boot volume type.
+    Type:           String
+    Default:        "gp3"
+    AllowedValues:
+      - gp3
+      - io1
+      - sc1
+      - st1
+  
+  EC2InstanceType:
+    Description:    Amazon EC2 instance type.
+    Type:           String
+    Default:        "t3.small"
+  
+  LatestLinuxAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+  
+  KeyPairName:
+    Description:     EC2 KeyPair.
+    Type:           'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must have a key pair.
+  
+  InstanceSGID:
+    Description:    Please choose Security Group for EC2 Instances
+    Type:           AWS::EC2::SecurityGroup::Id
+  
+  InstanceSubnetID:
+    Description:    Please choose Subnet for ASG and ALB
+    Type:           List<AWS::EC2::Subnet::Id>
+
+  ASGMinSize:
+    Description:    Auto Scaling Group Configuration Ec2 (MinSize) (DesiredSize)
+    Type:           String
+    Default:        "2"
+
+  ASGMaxSize:
+    Description:    Auto Scaling Group Configuration Ec2 (MaxSize)
+    Type:           String
+    Default:        "10"
+  
+  ACMCertificateIdentifier:
+    Description:    The AWS Certificate Manager (ACM) certificate identifier.
+    Type:           String
+    Default:        " "
+
+  BucketVersioning:
+    Description:    The versioning state of an Amazon S3 bucket. If you enable versioning, you must suspend versioning to disable it.
+    Type:           String
+    Default:        "Enabled"
+    AllowedValues:
+      - Enabled
+      - Suspended
+
+  ViewerProtocolPolicy:
+    Description:    The protocol that users can use to access the files in the origin that you specified in the TargetOriginId property when the default cache behavior is applied to a request.
+    Type:           String
+    Default:        "redirect-to-https"
+    AllowedValues:
+      - redirect-to-https
+      - allow-all
+      - https-only
+  
+Mappings:
+  CacheSettings:
+    dev:
+      DefaultTTL: 0
+      MaxTTL: 0
+      MinTTL: 0
+    hml:
+      DefaultTTL: 0
+      MaxTTL: 0
+      MinTTL: 0
+    prod:
+      DefaultTTL: 86400
+      MaxTTL: 31536000
+      MinTTL: 0
+  WAF:
+    dev:
+      ACLARN: arn:aws:wafv2:us-east-1:116762053366:global/webacl/hmldev_broetto-com-br-blog-solucoes/e2e580ce-157c-40c9-a66d-cae9378b45d7
+    hml:
+      ACLARN: arn:aws:wafv2:us-east-1:116762053366:global/webacl/hmldev_broetto-com-br-blog-solucoes/e2e580ce-157c-40c9-a66d-cae9378b45d7
+    prod:
+      ACLARN: arn:aws:wafv2:us-east-1:852138857024:global/webacl/AWSWAFSecurityAutomations/a1be57b1-dfbe-42c0-9dc4-502a5505defd
+  Aliases:
+    dev:
+      url: dev-www
+      mediaurl: dev-media
+    hml:
+      url: hml-www
+      mediaurl: hml-media
+    prod:
+      url: www
+      mediaurl: media
+
+
+Resources:
+
+
+# INSTANCE PROFILE SSM              
+  InstanceProfileSSM:
+    Type: AWS::IAM::InstanceProfile
+    DeletionPolicy: Retain
+    Properties:
+      Path: "/"
+      Roles:
+        - SSM
+
+# SECURITY GROUP 
+  SecurityGroupALB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AppName} ALB Security Group"
+      VpcId: !Ref InstanceVPCID
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "sg-${AppName}-${Environment}-alb"
+        - Key: "Application"
+          Value: !Ref 'AppName'
+        - Key: "Owner"
+          Value: !Ref 'Owner'
+        - Key: "Environment"
+          Value: !Ref 'Environment'
+
+# SECURITY GROUP INGRESS
+  SecurityGroupIngressALB:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroupALB
+    Properties:
+      GroupId: !GetAtt SecurityGroupALB.GroupId
+      Description: "ALB Traffic"
+      IpProtocol: -1
+      FromPort: 0
+      ToPort: 0
+      SourceSecurityGroupId: !GetAtt SecurityGroupALB.GroupId
+
+  AllowHTTP:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroupALB
+    Properties:
+      GroupId: !GetAtt SecurityGroupALB.GroupId
+      Description: "Public HTTP"
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  AllowHTTPS:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroupALB
+    Properties:
+      GroupId: !GetAtt SecurityGroupALB.GroupId
+      Description: "Public HTTPS"
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+  AllowVPCTraffic:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroupALB
+    Properties:
+      GroupId: !GetAtt SecurityGroupALB.GroupId
+      Description: "Public HTTPS"
+      IpProtocol: "-1"
+      FromPort: 0
+      ToPort: 0
+      CidrIp: 10.192.132.0/23
+
+#LOAD BALANCER
+  enviromentALB:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Name: !Sub "${AppName}-${Environment}-alb"
+        Type: application
+        Scheme: internet-facing
+        Subnets: !Ref SubnetID
+        SecurityGroups:
+          - !GetAtt SecurityGroupALB.GroupId
+        Tags:
+        - Key: "Name"
+          Value: !Sub "${AppName}-${Environment}-alb"
+        - Key: "Application"
+          Value: !Ref 'AppName'
+        - Key: "Owner"
+          Value: !Ref 'Owner'
+        - Key: "Environment"
+          Value: !Ref 'Environment'
+
+#LOAD BALANCER LISTENERS
+
+  HTTPlistener:
+     Type: "AWS::ElasticLoadBalancingV2::Listener"
+     Properties:
+       DefaultActions:
+         - Type: "redirect"
+           RedirectConfig:
+             Protocol: "HTTPS"
+             Port: 443
+             StatusCode: "HTTP_301"
+       LoadBalancerArn: !Ref enviromentALB
+       Port: 80
+       Protocol: "HTTP"
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref OriginALBTG
+      LoadBalancerArn: !Ref enviromentALB
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Sub "arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/${ACMCertificateIdentifier}"
+
+  # EC2 INSTANCE SECURITY GROUP
+  EC2InstanceSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: !Sub "${AppName} EC2 Instance Security Group"
+      VpcId: !Ref InstanceVPCID
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "sg-${AppName}-${Environment}"
+        - Key: "Application"
+          Value: !Ref 'AppName'
+        - Key: "Owner"
+          Value: !Ref 'Owner'
+        - Key: "Environment"
+          Value: !Ref 'Environment'
+
+# SECURITY GROUP INGRESS
+  AllowALBTraffic:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: EC2InstanceSG
+    Properties:
+      Description: "ALB Traffic"
+      GroupId: !Ref 'EC2InstanceSG'
+      ToPort: '0'
+      IpProtocol: -1
+      FromPort: '65535'
+      SourceSecurityGroupId: !GetAtt SecurityGroupALB.GroupId
+
+  AllowSelfTraffic:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: EC2InstanceSG
+    Properties:
+      Description: "Allow Self Traffic"
+      GroupId: !Ref 'EC2InstanceSG'
+      ToPort: '0'
+      IpProtocol: -1
+      FromPort: '65535'
+      SourceSecurityGroupId: !Ref 'EC2InstanceSG'
+
+  AllowbroettoNetworkTraffic:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: EC2InstanceSG
+    Properties:
+      Description: "broetto-global"
+      GroupId: !Ref 'EC2InstanceSG'
+      ToPort: '0'
+      IpProtocol: -1
+      FromPort: '65535'
+      CidrIp: 10.192.128.0/22
+    
+  OriginALBTG:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Sub '${AppName}-website-${Environment}80'
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: !Ref 'HealthCheckPath'
+      HealthCheckPort: !Sub '${OriginALBTGPort}'
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      Matcher: 
+        HttpCode: 200,301,302
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 300
+      TargetType: 'instance'
+      Port: !Sub '${OriginALBTGPort}'
+      Protocol: HTTP
+      VpcId: !Ref InstanceVPCID
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "ALB-tg80-${AppName}-${Environment}"
+        - Key: "Application"
+          Value: !Ref 'AppName'
+        - Key: "Owner"
+          Value: !Ref 'Owner'
+        - Key: "Environment"
+          Value: !Ref 'Environment'
+
+  # Auto Scaling Group LAUNCH TEMPLATE
+  myLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: !Sub "${AppName}-${Environment}-launchtemplate"
+      LaunchTemplateData:
+        IamInstanceProfile: 
+          Arn: !GetAtt InstanceProfileSSM.Arn
+        BlockDeviceMappings: 
+          - Ebs:
+              VolumeSize: !Ref "BootVolSize"
+              VolumeType: !Ref "BootVolType"
+              DeleteOnTermination: false
+              Encrypted: true
+            DeviceName: /dev/sda1
+        CreditSpecification: 
+          CpuCredits: Unlimited
+        ImageId: !Ref 'LatestLinuxAmiId'
+        InstanceType: !Ref 'EC2InstanceType'
+        KeyName: !Ref 'KeyPairName'
+        Monitoring: 
+          Enabled: true
+        SecurityGroupIds: 
+          - !Ref InstanceSGID
+          - !Ref EC2InstanceSG
+        UserData:
+          "Fn::Base64":
+            !Sub |
+            #cloud-boothook
+            #!/bin/bash -xe
+            # Get the latest CloudFormation package
+            dnf update -y aws-cfn-bootstrap
+            # Install Httpd
+            yum install -y httpd
+            systemctl enable httpd; systemctl restart httpd
+            # First index for health check
+            TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+            curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id > /var/www/html/index.html
+            # Get CodeDeploy agent
+            dnf install -y ruby wget
+            cd /tmp
+            wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
+            chmod +x ./install
+            ./install auto
+            systemctl enable codedeploy-agent; systemctl start codedeploy-agent
+            # Install latest version of PHP (8.2)
+            dnf install -y php-mysqlnd php-fpm php-mysqli php-json php php-devel php-gd mariadb105 
+            systemctl enable php-fpm; systemctl restart php-fpm
+            # Get cloudwatch agent
+            dnf install -y amazon-cloudwatch-agent
+            systemctl enable amazon-cloudwatch-agent; systemctl restart amazon-cloudwatch-agent
+            # System update
+            dnf update -y; dnf upgrade -y
+            # HOSTNAME
+            hostnamectl set-hostname broetto-${AppName}-${Environment}
+            
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ASG --region ${AWS::Region}
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: "Name"
+                Value: !Sub "ec2-${AppName}-${Environment}"
+              - Key: "Application"
+                Value: !Ref 'AppName'
+              - Key: "Owner"
+                Value: !Ref 'Owner'
+              - Key: "Environment"
+                Value: !Ref 'Environment'
+
+# Auto Scaling Group Configuration
+  ASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    CreationPolicy:
+      ResourceSignal:
+        Count: '0'
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: 'true'
+    Properties:
+      MinSize: !Ref ASGMinSize
+      MaxSize: !Ref ASGMaxSize
+      DesiredCapacity: !Ref ASGMinSize
+      HealthCheckGracePeriod: 300
+      LaunchTemplate:
+        LaunchTemplateId: !Ref myLaunchTemplate
+        Version: !GetAtt myLaunchTemplate.LatestVersionNumber
+      VPCZoneIdentifier: !Ref InstanceSubnetID
+      MetricsCollection: 
+        - Granularity: "1Minute"
+          Metrics: 
+            - "GroupMinSize"
+            - "GroupMaxSize"
+      TerminationPolicies:
+        - OldestLaunchConfiguration
+        - OldestInstance
+        - Default
+      TargetGroupARNs: 
+        - !Ref OriginALBTG
+      Tags:
+        - Key: "Name"
+          Value: !Sub "asg-${AppName}-${Environment}"
+          PropagateAtLaunch: "true"
+        - Key: "Application"
+          Value: !Ref 'AppName'
+          PropagateAtLaunch: "true"
+        - Key: "Owner"
+          Value: !Ref 'Owner'
+          PropagateAtLaunch: "true"
+        - Key: "Environment"
+          Value: !Ref 'Environment'
+          PropagateAtLaunch: "true"
+
+# CODEDEPLOY 
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub "broetto-${AppName}-website-${Environment}"
+      ComputePlatform: Server
+  
+  DeploymentGroup: 
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties: 
+      ApplicationName: 
+        Ref: "CodeDeployApplication"
+      DeploymentGroupName: !Join
+        - .
+        - - !FindInMap [Aliases, !Ref Environment, "url"]
+          - !Sub "${AlternateDomainNames}"
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: "CodeDeployDefault.OneAtATime"
+      DeploymentStyle:
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+        DeploymentType: IN_PLACE
+      AutoRollbackConfiguration:
+        Enabled: 'true'
+        Events:
+          - DEPLOYMENT_FAILURE
+      LoadBalancerInfo:
+        TargetGroupInfoList:
+          - Name: !GetAtt  OriginALBTG.TargetGroupName
+      AutoScalingGroups:
+        - !Ref ASG
+
+
+
