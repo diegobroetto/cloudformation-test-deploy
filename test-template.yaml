@@ -16,7 +16,7 @@ Parameters:
 
   InstanceVPCID:
     Description:    Please choose VPC
-    Type:           AWS::EC2::VPC::Id
+    Default: "vpc-0ad4cb6884a964720"
 
   AppName:
     Description:  Application environment name.
@@ -35,7 +35,7 @@ Parameters:
   
   SubnetID:
     Description:    Please choose Subnet for ASG and ALB
-    Type:           List<AWS::EC2::Subnet::Id>
+    Type:           "subnet-08306eb33c38a3df6, subnet-03059e19a63004947"
   
   HealthCheckPath:
     Description:    Origin ALB Target Group Health Check Path.
@@ -73,16 +73,16 @@ Parameters:
   
   KeyPairName:
     Description:     EC2 KeyPair.
-    Type:           'AWS::EC2::KeyPair::KeyName'
+    Default: "teste"
     ConstraintDescription: must have a key pair.
   
   InstanceSGID:
     Description:    Please choose Security Group for EC2 Instances
-    Type:           AWS::EC2::SecurityGroup::Id
+    Default: "sg-0d9d9eb2d5d0367ab"
   
   InstanceSubnetID:
     Description:    Please choose Subnet for ASG and ALB
-    Type:           List<AWS::EC2::Subnet::Id>
+    Default: "subnet-0a51fcd5fcde6ae1c, subnet-0db4c44a1a899eff6 "
 
   ASGMinSize:
     Description:    Auto Scaling Group Configuration Ec2 (MinSize) (DesiredSize)
