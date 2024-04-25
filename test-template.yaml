@@ -200,7 +200,7 @@ Resources:
       IpProtocol: "-1"
       FromPort: 0
       ToPort: 0
-      CidrIp: 10.192.132.0/23
+      CidrIp: 10.0.0.0/16
 
 #LOAD BALANCER
   enviromentALB:
@@ -299,7 +299,7 @@ Resources:
       ToPort: '0'
       IpProtocol: -1
       FromPort: '65535'
-      CidrIp: 10.192.128.0/22
+      CidrIp: 10.0.0.0/16
     
   OriginALBTG:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
