@@ -16,6 +16,7 @@ Parameters:
 
   InstanceVPCID:
     Description:    Please choose VPC
+    Type: AWS::EC2::VPC::Id
     Default: "vpc-0ad4cb6884a964720"
 
   AppName:
@@ -73,11 +74,13 @@ Parameters:
   
   KeyPairName:
     Description:     EC2 KeyPair.
+    Type: AWS::EC2::KeyPair::KeyName
     Default: "teste"
     ConstraintDescription: must have a key pair.
   
   InstanceSGID:
     Description:    Please choose Security Group for EC2 Instances
+    Type: String
     Default: "sg-0d9d9eb2d5d0367ab"
   
   InstanceSubnetID:
