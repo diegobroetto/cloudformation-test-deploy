@@ -16,7 +16,7 @@ Parameters:
 
   InstanceVPCID:
     Description:    Please choose VPC
-    Type: AWS::EC2::VPC::Id
+    Type: String
     Default: "vpc-0ad4cb6884a964720"
 
   AppName:
@@ -75,7 +75,7 @@ Parameters:
   
   KeyPairName:
     Description:     EC2 KeyPair.
-    Type: AWS::EC2::KeyPair::KeyName
+    Type: String
     Default: "teste"
     ConstraintDescription: must have a key pair.
   
@@ -102,24 +102,8 @@ Parameters:
   ACMCertificateIdentifier:
     Description:    The AWS Certificate Manager (ACM) certificate identifier.
     Type:           String
-    Default:        " "
+    Default:        "136b11b1-6af5-4894-8f25-01a1e2c39c1a"
 
-  BucketVersioning:
-    Description:    The versioning state of an Amazon S3 bucket. If you enable versioning, you must suspend versioning to disable it.
-    Type:           String
-    Default:        "Enabled"
-    AllowedValues:
-      - Enabled
-      - Suspended
-
-  ViewerProtocolPolicy:
-    Description:    The protocol that users can use to access the files in the origin that you specified in the TargetOriginId property when the default cache behavior is applied to a request.
-    Type:           String
-    Default:        "redirect-to-https"
-    AllowedValues:
-      - redirect-to-https
-      - allow-all
-      - https-only
   
 Mappings:
   CacheSettings:
@@ -135,13 +119,6 @@ Mappings:
       DefaultTTL: 86400
       MaxTTL: 31536000
       MinTTL: 0
-  WAF:
-    dev:
-      ACLARN: arn:aws:wafv2:us-east-1:116762053366:global/webacl/hmldev_broetto-com-br-blog-solucoes/e2e580ce-157c-40c9-a66d-cae9378b45d7
-    hml:
-      ACLARN: arn:aws:wafv2:us-east-1:116762053366:global/webacl/hmldev_broetto-com-br-blog-solucoes/e2e580ce-157c-40c9-a66d-cae9378b45d7
-    prod:
-      ACLARN: arn:aws:wafv2:us-east-1:852138857024:global/webacl/AWSWAFSecurityAutomations/a1be57b1-dfbe-42c0-9dc4-502a5505defd
   Aliases:
     dev:
       url: dev-www
