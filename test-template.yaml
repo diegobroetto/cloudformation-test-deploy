@@ -36,7 +36,8 @@ Parameters:
   
   SubnetID:
     Description:    Please choose Subnet for ASG and ALB
-    Type:           "subnet-08306eb33c38a3df6, subnet-03059e19a63004947"
+    Type: <AWS::EC2::Subnet::Id>
+    Default: "subnet-08306eb33c38a3df6, subnet-03059e19a63004947"
   
   HealthCheckPath:
     Description:    Origin ALB Target Group Health Check Path.
