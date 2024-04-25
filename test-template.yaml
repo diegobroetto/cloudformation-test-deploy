@@ -445,50 +445,6 @@ Resources:
           Value: !Ref 'Environment'
           PropagateAtLaunch: "true"
 
-# CODEDEPLOY 
-  CodeDeployServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      Path: /
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codedeploy.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
-
-  CodeDeployApplication:
-    Type: AWS::CodeDeploy::Application
-    Properties:
-      ApplicationName: !Sub "broetto-${AppName}-website-${Environment}"
-      ComputePlatform: Server
-  
-  DeploymentGroup: 
-    Type: AWS::CodeDeploy::DeploymentGroup
-    Properties: 
-      ApplicationName: 
-        Ref: "CodeDeployApplication"
-      DeploymentGroupName: !Join
-        - .
-        - - !FindInMap [Aliases, !Ref Environment, "url"]
-          - !Sub "${AlternateDomainNames}"
-      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
-      DeploymentConfigName: "CodeDeployDefault.OneAtATime"
-      DeploymentStyle:
-        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
-        DeploymentType: IN_PLACE
-      AutoRollbackConfiguration:
-        Enabled: 'true'
-        Events:
-          - DEPLOYMENT_FAILURE
-      LoadBalancerInfo:
-        TargetGroupInfoList:
-          - Name: !GetAtt  OriginALBTG.TargetGroupName
-      AutoScalingGroups:
-        - !Ref ASG
 
 
 
