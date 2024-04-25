@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-template-file-path: './test-template.yaml'
-
 Parameters:
 
   Environment:
