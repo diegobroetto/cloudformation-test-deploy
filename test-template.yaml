@@ -36,7 +36,7 @@ Parameters:
   
   SubnetID:
     Description:    Please choose Subnet for ASG and ALB
-    Type: <AWS::EC2::Subnet::Id>
+    Type: String
     Default: "subnet-08306eb33c38a3df6, subnet-03059e19a63004947"
   
   HealthCheckPath:
@@ -86,6 +86,7 @@ Parameters:
   
   InstanceSubnetID:
     Description:    Please choose Subnet for ASG and ALB
+    Type: String
     Default: "subnet-0a51fcd5fcde6ae1c, subnet-0db4c44a1a899eff6 "
 
   ASGMinSize:
