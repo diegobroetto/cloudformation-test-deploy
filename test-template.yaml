@@ -209,7 +209,8 @@ Resources:
         Name: !Sub "${AppName}-${Environment}-alb"
         Type: application
         Scheme: internet-facing
-        Subnets: !Ref SubnetID
+        Subnets:  
+          Fn::Split: [",", !Ref SubnetID]
         SecurityGroups:
           - !GetAtt SecurityGroupALB.GroupId
         Tags:
@@ -417,7 +418,8 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref myLaunchTemplate
         Version: !GetAtt myLaunchTemplate.LatestVersionNumber
-      VPCZoneIdentifier: !Ref InstanceSubnetID
+      VPCZoneIdentifier:
+         Fn::Split: [",", !Ref InstanceSubnetID]
       MetricsCollection: 
         - Granularity: "1Minute"
           Metrics: 
